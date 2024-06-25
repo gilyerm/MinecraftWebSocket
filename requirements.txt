@@ -1,0 +1,7 @@
+websockets~=12.0
+UUID~=1.30
+convert-case~=1.2.3
+pycryptodome~=3.19.1
+flake8~=7.1.0
+pylint~=3.2.3
+pycodestyle~=2.12.0
