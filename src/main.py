@@ -1,6 +1,7 @@
 # flake8: noqa: F403, F405
 # pylint: disable=undefined-variable, unused-argument, unused-wildcard-import
 import logging
+import os
 
 from src.bedrock.server import Server
 from src.bedrock.game_context import *
@@ -125,8 +126,9 @@ def setup_game_events(app: Server):
 
 
 def main():
-    for event in get_all_game_events():
-        print(event)
+
+    host = os.getenv('HOST', 'localhost')
+    port = int(os.getenv('PORT', 6464))
 
     logging.basicConfig(level=logging.INFO)
 
@@ -136,7 +138,7 @@ def main():
 
     setup_game_events(app)
 
-    app.start('localhost', 6464)
+    app.start(host, port)
     input('Press enter to close the server')
     app.close()
 
