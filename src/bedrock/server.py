@@ -137,8 +137,6 @@ class Server(EventHandling):
             "Encrypted connection established, now listening for updates..."
         )
 
-        logger.info("Connected to Minecraft!")
-
         for event_name in self._game_event_handlers:
             identifier = uuid.uuid4()
             await self._ws.send(
@@ -156,6 +154,15 @@ class Server(EventHandling):
                     ).encode()
                 )
             )
+
+        try:
+            first_message_encrypted = await self._ws.recv()
+            first_message = session.decrypt(first_message_encrypted)
+            first_data = json.loads(first_message)
+            await self._process_first_data(first_data)
+        except json.JSONDecodeError as json_err:
+            logger.error(f"JSON decoding error: {json_err}")
+            raise json_err
 
         try:
             async for message_encrypted in self._ws:
@@ -195,6 +202,26 @@ class Server(EventHandling):
         logger.debug(f"triggering server event {event_name}... ")
         self._loop.create_task(server_event(ctx))
         logger.debug(f"triggered server event {event_name}")
+
+    async def _process_first_data(self, data: Mapping[str, Any]) -> None:
+        """
+        Processes the first incoming data.
+
+        This method processes the first incoming data and checks if the connection was successful.
+
+        Parameters
+        ----------
+        data : Mapping[str, Any]
+            The first incoming data to be processed.
+        """
+
+        if "body" not in data or "statusCode" not in data["body"] or type(data["body"]["statusCode"]) is not int:
+            raise ValueError("Failed to connect to the Minecraft")
+
+        if data["body"]["statusCode"] != 0:
+            raise ConnectionError("Failed to connect to the Minecraft")
+
+        logger.info("Connected to Minecraft!")
 
     async def _process_data(self, data: Mapping[str, Any], session: AuthenticatedSession) -> None:
         """
@@ -307,7 +334,7 @@ class Server(EventHandling):
         return None
 
     @staticmethod
-    async def enable_encryption(websocket, session: EncryptionSession) -> AuthenticatedSession:
+    async def enable_encryption(websocket: wss.WebSocketServerProtocol, session: EncryptionSession) -> AuthenticatedSession:
         """
         Negotiates the authentication handshake.
 
@@ -363,6 +390,8 @@ class Server(EventHandling):
                 f"Connection was refused. Response:\n{pprint.pformat(response)}"
             ) from e
 
-        logger.debug(f"Received client pubkey {public_key}")
+        logger.debug(f"Received client public key= {public_key}")
+        logger.debug(response)
+        logger.debug(json.loads(await websocket.recv()))  # ignore the next message
 
         return AuthenticatedSession(session, public_key)
